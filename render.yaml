@@ -1,0 +1,8 @@
+services:
+  - type: web
+    name: lua-obfuscate-api
+    env: docker
+    buildCommand: "docker build -t lua-obfuscate-api ."
+    startCommand: "docker run --rm -p $PORT:$PORT lua-obfuscate-api"
+    plan: free
+    autoDeploy: false
