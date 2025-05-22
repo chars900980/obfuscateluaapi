@@ -2,7 +2,7 @@ services:
   - type: web
     name: lua-obfuscate-api
     env: docker
-    buildCommand: "docker build -t lua-obfuscate-api ."
-    startCommand: "docker run --rm -p $PORT:$PORT lua-obfuscate-api"
+    # Không cần buildCommand vì Render tự build Dockerfile
+    startCommand: "uvicorn main:app --host 0.0.0.0 --port $PORT"
     plan: free
     autoDeploy: false
