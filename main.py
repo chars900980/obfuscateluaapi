@@ -1,10 +1,20 @@
 from fastapi import FastAPI, HTTPException
+from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 import os
 import subprocess
 import uuid
 
 app = FastAPI()
+
+# Thêm middleware CORS với origin cụ thể
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["https://duckxh4101.x10.bz/obfuscatelua/"],  # Chỉ cho phép origin này
+    allow_credentials=True,
+    allow_methods=["*"],  # Cho phép tất cả method (GET, POST, v.v.)
+    allow_headers=["*"],  # Cho phép tất cả header
+)
 
 # Định nghĩa model cho dữ liệu đầu vào
 class LuaCode(BaseModel):
@@ -31,7 +41,7 @@ async def obfuscate_lua_code(lua_code: LuaCode):
         
         # Chạy lệnh obfuscation
         output_filename = f"{input_filename.split('.')[0]}.obfuscated.lua"
-        command = ["lua", "./cli.lua", "--preset", "Medium", input_filename]
+        command = ["lua5.3", "./cli.lua", "--preset", "Medium", input_filename]
         
         try:
             result = subprocess.run(
