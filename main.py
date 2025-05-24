@@ -39,20 +39,18 @@ local function chk_env() local t=math.random(1e3,9e3);rawset(_G,t,true);if not r
 local function chk_time() local s=time();for i=1,5e3 do math.random()end;if time()-s>5 then error("Time anomaly!")end end
 local function self_chk() local f=loadstring("local x=42;return x");if not f or f()~=42 then error("Integrity fail!")end end
 
--- Kiểm tra môi trường Roblox nâng cao
-local function chk_roblox() local s,e=pcall(function() return _G.game and _G.workspace end);if not s or not e then return false end return true end
+-- Kiểm tra môi trường Roblox và skidder
+local function chk_roblox() local s,e=pcall(function() return _G.game and _G.game:GetService("Players") end);return s and e end
 local function chk_globals() if not _G.print or not _G.math or not _G.string then return false end return true end
-
--- Kiểm tra skidder
 local function is_skidder()
     if not chk_roblox() then return true end
     if not chk_globals() then return true end
     local orig_tostring=tostring;local test="test";if tostring(test)~="test" then return true end
-    local s=0;local info=debug and debug.getinfo;local f=info and info(is_skidder,"S");if f and f.source:find("hook")then return true end
+    local s,e=pcall(function() return debug end);if s and e then return true end
     return false
 end
 
--- Gây rối và nuke khi phát hiện skidder
+-- Nuke khi phát hiện skidder
 local function nuke()
     print("Skidder detected! Nuking...")
     for i=1,1e13 do print(i) end
@@ -68,22 +66,19 @@ local function protect()
     if math.random(1,1000)==42 then error("Random check failed!")end
 end
 
--- 100 hàm giả gây chú ý
+-- 300 hàm giả với nội dung giả
 local fake=""
-for i=1,100 do
-    local name=({"autofarm","autobuy","autosell","autoquest","autoloot","autoupgrade","autospin","autotrade","autofish","autoboss",
-                "autoclick","autodrop","autopick","autolevel","autohit","autofly","autokill","autobuff","autoboost","autospeed",
-                "autogold","autogem","autopoint","autoevent","autotask","autowin","autobattle","autodefend","autocollect","autopet",
-                "autohack","autodamage","autoshield","autofreeze","autolock","autounlock","autosave","autoload","autocheat",
-                "autowarp","autoport","autotele","autoblock","autounblock","autofire","autoheal","autopower","autodefense",
-                "autostrike","autoblast","autoshot","autolaunch","autododge","autoevasion","autoshieldup","autobreak","autofix",
-                "autoreset","autoreload","autobackup","autorest","autofocus","autotrack","autotarget","autolaser","autobeam",
-                "autodrive","autoforge","autosmelt","autocraft","autobuild","autodestroy","autodelete","autofusion","autoevolve",
-                "autotransform","autoupdate","autodownload","autoupload","autodeploy","autowork","autofeed","autoharvest",
-                "autoplant","autowater","autofence","autoguard","autopatrol","autoscout","autosnipe","autobomb","autoblast",
-                "autodetonate","autotrigger","autoactivate","autodeactivate","autolimit","autounlimit"})[math.random(1,70)]
+for i=1,300 do
+    local name
+    if i%2==0 then
+        name=({"autofarm","autobuy","autosell","autoquest","autoloot","autoupgrade","autospin","autotrade","autofish","autoboss",
+               "autoclick","autodrop","autopick","autolevel","autohit","autofly","autokill","autobuff","autoboost","autospeed",
+               "autogold","autogem","autopoint","autoevent","autotask","autowin","autobattle","autodefend","autocollect","autopet"})[math.random(1,30)]
+    else
+        name="rnd_"..string.char(math.random(97,122))..math.random(1e3,9e3)
+    end
     local var="v"..math.random(1e3,9e3)
-    fake=fake.."local function "..name.."_"..var.."()local x="..math.random(1e4)..";return x*"..math.random(1,100).."end;"..name.."_"..var.."();"
+    fake=fake.."local function "..name.."_"..var.."() local x="..math.random(1e4)..";for i=1,"..math.random(10,50).." do x=x+"..math.random(1,100)..";end;local y=game:GetService('Players').LocalPlayer;y.Character.Humanoid.WalkSpeed="..math.random(16,100)..";return x*y.WalkSpeed end;"..name.."_"..var.."();"
 end
 
 -- Thực thi
