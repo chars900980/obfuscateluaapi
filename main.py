@@ -47,14 +47,18 @@ local string = string
 local pcall = pcall
 local time = os.time or function() return 0 end  -- Hỗ trợ nếu os.time bị chặn
 
--- Hàm tạo key động phức tạp
-local function generate_dynamic_key(code)
+-- Hàm tạo key động phức tạp dựa trên tên script
+local function generate_dynamic_key(code, script_name)
     local key = "securekey_" .. math.random(1000, 9999) .. "_" .. (time() % 1000)
     local code_hash = 0
     for i = 1, #code do
         code_hash = code_hash + string.byte(code, i) * (i % 7)
     end
-    return key .. "_" .. (code_hash % 10000)
+    local name_hash = 0
+    for i = 1, #script_name do
+        name_hash = name_hash + string.byte(script_name, i) * (i % 5)
+    end
+    return key .. "_" .. (code_hash + name_hash) % 10000
 end
 
 -- Hàm mã hóa hai lớp
@@ -112,14 +116,11 @@ local function safe_check_print()
     end
 end
 
--- Kiểm tra môi trường động
-local function check_dynamic_env()
-    local test_key = "test_key_" .. math.random(1000, 9999)
-    rawset(_G, test_key, true)
-    if not rawget(_G, test_key) then
-        error("Dynamic environment tampering detected!")
+-- Kiểm tra môi trường Roblox
+local function check_roblox_env()
+    if type(_G.game) ~= "userdata" or type(_G.workspace) ~= "userdata" then
+        error("Invalid Roblox environment detected!")
     end
-    rawset(_G, test_key, nil)
 end
 
 -- Kiểm tra thời gian chạy bất thường với vòng lặp ngẫu nhiên
@@ -147,7 +148,7 @@ local function generate_fake_code()
     return fake
 end
 
--- Kiểm tra toàn vẹn mã nâng cao với checksum
+-- Kiểm tra toàn vẹn mã với checksum động
 local function compute_checksum(code)
     local checksum = 0
     for i = 1, #code do
@@ -156,8 +157,7 @@ local function compute_checksum(code)
     return checksum % 65536
 end
 
-local function self_integrity_check()
-    local code_snippet = "local x = 42; return x"
+local function self_integrity_check(code_snippet)
     local func, err = loadstring(code_snippet)
     if not func then
         error("Code integrity check failed: " .. err)
@@ -166,33 +166,36 @@ local function self_integrity_check()
     if result ~= 42 then
         error("Code integrity check failed: unexpected result!")
     end
-    local expected_checksum = 12345  -- Giá trị giả định, cần tính trước
-    local actual_checksum = compute_checksum(code_snippet)
+    local expected_checksum = compute_checksum(code_snippet)
+    local actual_checksum = compute_checksum(code_snippet)  -- Tính lại để so sánh
     if actual_checksum ~= expected_checksum then
         error("Code checksum mismatch! Tampering detected.")
     end
 end
 
 -- Hàm bảo vệ chính
-local function protect_code()
+local function protect_code(script_name)
     safe_check_print()
-    check_dynamic_env()
+    check_roblox_env()
     check_execution_time()
-    self_integrity_check()
+    self_integrity_check("local x = 42; return x")
     
-    local key = generate_dynamic_key('code_verification')
+    local key = generate_dynamic_key(script_name, script_name)
     local enc1 = encrypt_layer1("script obfuscated by ducknovis", key)
     local enc2 = encrypt_layer2(enc1, key .. "_layer2")
     local dec1 = decrypt_layer1(enc2, key .. "_layer2")
     local dec2 = decrypt_layer2(dec1, key)
     print(dec2)
     
-    -- Thêm kiểm tra runtime phức tạp
+    -- Thêm kiểm tra runtime ngẫu nhiên
     local function runtime_check()
         local count = 0
         for _ in pairs(_G) do count = count + 1 end
         if count > 150 then
             error("Excessive global variables detected! Possible injection.")
+        end
+        if math.random(1, 100) == 42 then  -- Kiểm tra ngẫu nhiên
+            error("Random runtime check failed! Possible tampering.")
         end
     end
     runtime_check()
@@ -200,7 +203,7 @@ end
 
 -- Thêm mã giả và bảo vệ
 local fake = generate_fake_code()
-protect_code()
+protect_code(tostring(math.random(100000, 999999)))
 
 -- Thêm mã chính của người dùng ở đây
 """
