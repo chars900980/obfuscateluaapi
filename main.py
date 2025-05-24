@@ -47,27 +47,38 @@ local string = string
 local pcall = pcall
 local time = os.time or function() return 0 end  -- Hỗ trợ nếu os.time bị chặn
 
--- Hàm mã hóa với key động
-local function generate_key()
-    return "securekey_" .. math.random(1000, 9999) .. "_" .. (time() % 1000)
+-- Hàm tạo key động phức tạp
+local function generate_dynamic_key(code)
+    local key = "securekey_" .. math.random(1000, 9999) .. "_" .. (time() % 1000)
+    local code_hash = 0
+    for i = 1, #code do
+        code_hash = code_hash + string.byte(code, i) * (i % 7)
+    end
+    return key .. "_" .. (code_hash % 10000)
 end
 
+-- Hàm mã hóa với key động
 local function encrypt(str, key)
     local result = ""
+    local key_hash = 0
+    for i = 1, #key do key_hash = key_hash + string.byte(key, i) end
     for i = 1, #str do
         local b = string.byte(str, i)
         local k = string.byte(key, (i - 1) % #key + 1)
-        result = result .. string.char((b + k) % 256)
+        result = result .. string.char((b + k + (key_hash % 10)) % 256)
     end
     return result
 end
 
+-- Hàm giải mã
 local function decrypt(enc, key)
     local result = ""
+    local key_hash = 0
+    for i = 1, #key do key_hash = key_hash + string.byte(key, i) end
     for i = 1, #enc do
         local b = string.byte(enc, i)
         local k = string.byte(key, (i - 1) % #key + 1)
-        result = result .. string.char((b - k) % 256)
+        result = result .. string.char((b - k - (key_hash % 10)) % 256)
     end
     return result
 end
@@ -75,7 +86,7 @@ end
 -- Kiểm tra hành vi print an toàn
 local function safe_check_print()
     local orig_print = print
-    local test_val = "test"
+    local test_val = "verification"
     local success, err = pcall(function() orig_print(test_val) end)
     if not success or err then
         error("Print function tampering detected!")
@@ -92,40 +103,68 @@ local function check_dynamic_env()
     rawset(_G, test_key, nil)
 end
 
--- Tạo mã junk phức tạp
-local function generate_junk()
-    local junk = ""
-    for i = 1, math.random(15, 25) do
-        local var = string.char(math.random(65, 90)) .. math.random(1, 999)
-        junk = junk .. var .. " = function() return " .. math.random(1, 9999) .. " end;"
-        junk = junk .. var .. "() + " .. math.random(1, 999) .. ";"
+-- Kiểm tra thời gian chạy bất thường
+local function check_execution_time()
+    local start = time()
+    local dummy = 0
+    for i = 1, 5000 do
+        dummy = dummy + math.random(1, 100)
     end
-    return junk
+    local duration = (time() - start)
+    if duration > 5 then
+        error("Execution time anomaly detected! Possible debugger active.")
+    end
+end
+
+-- Tạo mã giả (fake code) để làm khó phân tích
+local function generate_fake_code()
+    local fake = ""
+    for i = 1, math.random(5, 10) do
+        local var = string.char(math.random(65, 90)) .. math.random(1, 999)
+        fake = fake .. "local " .. var .. " = function() local x = " .. math.random(1, 9999) .. "; return x * 2 end;"
+        fake = fake .. var .. "();"
+    end
+    return fake
+end
+
+-- Tự kiểm tra tính toàn vẹn của mã
+local function self_integrity_check()
+    local code_snippet = "local x = 42; return x"
+    local func, err = loadstring(code_snippet)
+    if not func then
+        error("Code integrity check failed: " .. err)
+    end
+    local result = func()
+    if result ~= 42 then
+        error("Code integrity check failed: unexpected result!")
+    end
 end
 
 -- Hàm bảo vệ chính
 local function protect_code()
     safe_check_print()
     check_dynamic_env()
-    local key = generate_key()
-    local enc = encrypt("Protected_" .. key, key)
+    check_execution_time()
+    self_integrity_check()
+    
+    local key = generate_dynamic_key('code_verification')
+    local enc = encrypt("script obfuscated by ducknovis", key)
     local dec = decrypt(enc, key)
-    if not string.find(dec, "Protected") then
-        error("Encryption integrity check failed!")
-    end
-    -- Thêm kiểm tra runtime
+    print(dec)
+    
+    -- Thêm kiểm tra runtime phức tạp
     local function runtime_check()
         local count = 0
         for _ in pairs(_G) do count = count + 1 end
-        if count > 100 then
-            error("Excessive global variables detected!")
+        if count > 150 then
+            error("Excessive global variables detected! Possible injection.")
         end
     end
     runtime_check()
 end
 
--- Thêm mã junk và bảo vệ
-local junk = generate_junk()
+-- Thêm mã giả và bảo vệ
+local fake = generate_fake_code()
 protect_code()
 
 -- Thêm mã chính của người dùng ở đây
