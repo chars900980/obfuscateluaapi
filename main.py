@@ -7,27 +7,16 @@ import uuid
 import logging
 import time
 
-# Cấu hình logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 app = FastAPI()
+app.add_middleware(CORSMiddleware, allow_origins=["https://duckxh4101.x10.bz/obfuscatelua/"], allow_credentials=True, allow_methods=["*"], allow_headers=["*"])
 
-# Thêm middleware CORS với origin cụ thể
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["https://duckxh4101.x10.bz/obfuscatelua/"],  # Chỉ cho phép origin này
-    allow_credentials=True,
-    allow_methods=["*"],  # Cho phép tất cả method (GET, POST, v.v.)
-    allow_headers=["*"],  # Cho phép tất cả header
-)
-
-# Định nghĩa model cho dữ liệu đầu vào
 class LuaCode(BaseModel):
     code: str
 
 def get_next_filename(base_name="new", extension=".lua"):
-    """Tìm tên file tiếp theo (new.lua, new1.lua, new2.lua, ...)"""
     counter = 0
     while True:
         filename = f"{base_name}{'' if counter == 0 else counter}{extension}"
@@ -35,7 +24,6 @@ def get_next_filename(base_name="new", extension=".lua"):
             return filename
         counter += 1
 
-# Hàm thêm mã bảo mật vào script
 def add_security_code(original_code):
     security_code = """
 local _G, rawget, rawset, error, math, string, pcall, time = _G, rawget, rawset, error, math, string, pcall, os.time or function() return 0 end
@@ -51,18 +39,36 @@ local function chk_env() local t=math.random(1e3,9e3);rawset(_G,t,true);if not r
 local function chk_time() local s=time();for i=1,5e3 do math.random()end;if time()-s>5 then error("Time anomaly!")end end
 local function self_chk() local f=loadstring("local x=42;return x");if not f or f()~=42 then error("Integrity fail!")end end
 
--- Kiểm tra chống skidder
-local function chk_debug() if debug and debug.getinfo then error("Debugger detected! Script nuked.") end end
-local function chk_hook() if hook and hookmetamethod then error("Hook detected! Script nuked.") end end
-local function chk_stack() local s=0;for k,v in pairs(debug and debug.getstack or {})do s=s+1 end;if s>10 then error("Stack tampered! Script nuked.")end end
+-- Kiểm tra môi trường Roblox nâng cao
+local function chk_roblox() local s,e=pcall(function() return _G.game and _G.workspace end);if not s or not e then return false end return true end
+local function chk_globals() if not _G.print or not _G.math or not _G.string then return false end return true end
 
--- Hàm bảo vệ
-local function protect() chk_prnt();chk_env();chk_time();self_chk();chk_debug();chk_hook();chk_stack()
-    local k=gen_key("code_ver");local e=enc("script obfuscated by ducknovis",k);local d=dec(e,k);print(d)
-    if math.random(1,100)==42 then error("Random nuke triggered!") end
+-- Kiểm tra skidder
+local function is_skidder()
+    if not chk_roblox() then return true end
+    if not chk_globals() then return true end
+    local orig_tostring=tostring;local test="test";if tostring(test)~="test" then return true end
+    local s=0;local info=debug and debug.getinfo;local f=info and info(is_skidder,"S");if f and f.source:find("hook")then return true end
+    return false
 end
 
--- 100 hàm giả ngẫu nhiên gây chú ý
+-- Gây rối và nuke khi phát hiện skidder
+local function nuke()
+    print("Skidder detected! Nuking...")
+    for i=1,1e13 do print(i) end
+    for i=1,1e5 do local x=math.random(1e4);x=x*x*x;end
+    error("Script terminated due to unauthorized access!")
+end
+
+-- Hàm bảo vệ
+local function protect()
+    chk_prnt();chk_env();chk_time();self_chk()
+    if is_skidder() then nuke() end
+    local k=gen_key("code_ver");local e=enc("script obfuscated by ducknovis",k);local d=dec(e,k);print(d)
+    if math.random(1,1000)==42 then error("Random check failed!")end
+end
+
+-- 100 hàm giả gây chú ý
 local fake=""
 for i=1,100 do
     local name=({"autofarm","autobuy","autosell","autoquest","autoloot","autoupgrade","autospin","autotrade","autofish","autoboss",
