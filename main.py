@@ -4,6 +4,11 @@ from pydantic import BaseModel
 import os
 import subprocess
 import uuid
+import logging
+
+# Cấu hình logging
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
 
 app = FastAPI()
 
@@ -206,11 +211,14 @@ async def obfuscate_lua_code(lua_code: LuaCode):
                 text=True,
                 check=True
             )
+            logger.info(f"Obfuscation command executed successfully: {command}")
         except subprocess.CalledProcessError as e:
+            logger.error(f"Obfuscation failed: {e.stderr}")
             raise HTTPException(status_code=500, detail=f"Obfuscation failed: {e.stderr}")
         
         # Đọc nội dung file đã obfuscate
         if not os.path.exists(output_filename):
+            logger.error(f"Obfuscated file not found: {output_filename}")
             raise HTTPException(status_code=500, detail="Obfuscated file not found")
             
         with open(output_filename, "r", encoding="utf-8") as f:
@@ -226,4 +234,5 @@ async def obfuscate_lua_code(lua_code: LuaCode):
         return {"obfuscated_code": final_obfuscated_code}
     
     except Exception as e:
+        logger.error(f"Exception occurred: {str(e)}")
         raise HTTPException(status_code=500, detail=str(e))
