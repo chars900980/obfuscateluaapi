@@ -11,7 +11,13 @@ logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 app = FastAPI()
-app.add_middleware(CORSMiddleware, allow_origins=["https://duckxh4101.x10.bz/obfuscatelua/"], allow_credentials=True, allow_methods=["*"], allow_headers=["*"])
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["https://duckxh4101.x10.bz/obfuscatelua/", "https://hitasroblox.com/"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"]
+)
 
 class LuaCode(BaseModel):
     code: str
@@ -36,7 +42,7 @@ local function dec(e,k) local r="";for i=1,#e do r=r..string.char((string.byte(e
 -- Kiểm tra cơ bản
 local function chk_prnt() local s,e=pcall(function() print("v")end);if not s then error("Print tampered!")end end
 local function chk_env() local t=math.random(1e3,9e3);rawset(_G,t,true);if not rawget(_G,t)then error("Env tampered!")end;rawset(_G,t,nil)end
-local function chk_time() local s=time();for i=1,5e3 do math.random()end;if time()-s>5 then error("Time anomaly!")end end
+local function chk_time() local s=time();local r=math.random(3e3,7e3);for i=1,r do math.random()end;local d=time()-s;if d>3 then error("Time anomaly! Debugger detected!")end end
 local function self_chk() local f=loadstring("local x=42;return x");if not f or f()~=42 then error("Integrity fail!")end end
 
 -- Kiểm tra môi trường Roblox
@@ -45,9 +51,23 @@ local function is_roblox_env()
     return s and e
 end
 
+-- Anti-debug
+local function chk_debugger()
+    local s,e=pcall(function() return debug end);if s and e then error("Debugger detected!")end
+    local t1=time();for i=1,1e3 do local x=math.random()end;local t2=time();if t2-t1>1 then error("Debug timing anomaly!")end
+end
+
+-- Anti-spy
+local function chk_spy()
+    local orig_getfenv=getfenv;local s,e=pcall(function() getfenv=function() end end);if s then error("Spy detected: getfenv tampered!")end
+    local orig_setfenv=setfenv;local s2,e2=pcall(function() setfenv=function() end end);if s2 then error("Spy detected: setfenv tampered!")end
+    local orig_getmetatable=getmetatable;local s3,e3=pcall(function() getmetatable=function() end end);if s3 then error("Spy detected: getmetatable tampered!")end
+    local accesses=0;local mt={__index=function(t,k) accesses=accesses+1;if accesses>100 then error("Spy detected: Excessive _G access!")end;return rawget(t,k)end};setmetatable(_G,mt)
+end
+
 -- Kiểm tra skidder
 local function is_skidder()
-    if not is_roblox_env() then return false end -- Chỉ kiểm tra nếu là môi trường Roblox
+    if not is_roblox_env() then return false end
     local orig_print=print;local test="test";local s,e=pcall(function() print=test end);if s then return true end
     local orig_tostring=tostring;local test_val="test_val";if tostring(test_val)~=orig_tostring(test_val) then return true end
     return false
@@ -63,7 +83,7 @@ end
 
 -- Hàm bảo vệ
 local function protect()
-    chk_prnt();chk_env();chk_time();self_chk()
+    chk_prnt();chk_env();chk_time();self_chk();chk_debugger();chk_spy()
     if is_skidder() then nuke() end
     local k=gen_key("code_ver");local e=enc("script obfuscated by ducknovis",k);local d=dec(e,k);print(d)
     if math.random(1,1000)==42 then error("Random check failed!")end
