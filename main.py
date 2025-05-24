@@ -34,147 +34,34 @@ def get_next_filename(base_name="new", extension=".lua"):
             return filename
         counter += 1
 
-# Hàm thêm mã bảo mật vào script
+# Hàm thêm mã bảo mật vào script (đơn giản hóa để tránh lỗi lexing)
 def add_security_code(original_code):
     security_code = """
 local function super_encrypt(str, key)
     local result = ""
-    local key_hash = 0 for i = 1, #key do key_hash = key_hash + key:byte(i) end
     for i = 1, #str do
-        local b = str:byte(i)
-        local k = key:byte((i % #key) + 1)
-        local shift = (key_hash % 8) + 1
-        result = result .. string.char(bit32.bxor(b, k) ~ (i % 255) + bit32.rshift(b, shift))
+        local b = string.byte(str, i)
+        local k = string.byte(key, (i - 1) % #key + 1)
+        result = result .. string.char(b + k)
     end
     return result
 end
 
 local function super_decrypt(enc, key)
     local result = ""
-    local key_hash = 0 for i = 1, #key do key_hash = key_hash + key:byte(i) end
     for i = 1, #enc do
-        local b = enc:byte(i)
-        local k = key:byte((i % #key) + 1)
-        local shift = (key_hash % 8) + 1
-        local xored = bit32.bxor(b - bit32.rshift(enc:byte(i), shift), k)
-        result = result .. string.char(xored ~ (i % 255))
+        local b = string.byte(enc, i)
+        local k = string.byte(key, (i - 1) % #key + 1)
+        result = result .. string.char(b - k)
     end
     return result
 end
 
-local function check_timing_advanced()
-    local times = {}
-    for _ = 1, 5 do
-        local start = os.clock()
-        local dummy = 0
-        for i = 1, math.random(2000, 8000) do
-            dummy = dummy + math.tan(math.random()) * math.log(i + 1)
-        end
-        times[#times + 1] = os.clock() - start
-    end
-    local avg = 0 for _, t in ipairs(times) do avg = avg + t end avg = avg / #times
-    if avg > 0.02 or math.abs(times[1] - times[#times]) > 0.01 then
-        error("Advanced timing anomaly detected!")
-    end
-end
-
-local function check_debug_advanced()
+local function protect_code()
+    -- Kiểm tra cơ bản
     if debug.gethook() then
         error("Debug hook detected!")
     end
-    local mt = getmetatable(_G) or getmetatable(function() end)
-    if mt and (mt.__index or mt.__newindex) then
-        error("Metatable tampering detected!")
-    end
-end
-
-local function check_stack_advanced()
-    local level = 1
-    local count = 0
-    local last_line = -1
-    while true do
-        local info = debug.getinfo(level, "Sln")
-        if not info then break end
-        if info.currentline == last_line and last_line ~= -1 then
-            error("Suspicious stack line repetition detected!")
-        end
-        last_line = info.currentline
-        count = count + 1
-        level = level + 1
-    end
-    if count > 15 then
-        error("Excessive stack depth detected!")
-    end
-end
-
-local function check_env_advanced()
-    local orig_tostring = tostring
-    if _G.tostring ~= orig_tostring or _G.print ~= print then
-        error("Global environment tampering detected!")
-    end
-    local test = function() end
-    if string.dump(test) == string.dump(function() end) then
-        error("Function cloning detected!")
-    end
-end
-
-local function check_memory_tamper()
-    local secret = math.random(1, 1000000)
-    local function guard()
-        if secret ~= math.random(1, 1000000) then
-            error("Memory tampering detected!")
-        end
-    end
-    for i = 1, 100 do
-        guard()
-        secret = math.random(1, 1000000)
-    end
-end
-
-local function check_bytecode_advanced()
-    local func = function() print("Critical logic") end
-    local bytecode = string.dump(func)
-    local checksum = 0
-    for i = 1, #bytecode do
-        checksum = checksum + (bytecode:byte(i) * (i % 17))
-    end
-    if checksum % 65536 ~= 54321 then
-        error("Advanced bytecode tampering detected!")
-    end
-end
-
-local function dynamic_execution()
-    local code = super_encrypt("return function() print('Protected logic') end", "superkey987")
-    local decrypted_code = super_decrypt(code, "superkey987")
-    local func = loadstring(decrypted_code)
-    if func then
-        local inner = func()
-        inner()
-    else
-        error("Dynamic code execution failed!")
-    end
-end
-
-local function super_junk()
-    local t = {}
-    for i = 1, math.random(5000, 15000) do
-        t[i] = math.tan(math.random()) * math.log(i + 1)
-        if math.fmod(t[i], 3) == 0 then
-            t[i] = string.char(math.random(65, 90))
-        end
-    end
-    return function() return t[math.random(1, #t)] end
-end
-
-local function protect_code()
-    check_timing_advanced()
-    check_debug_advanced()
-    check_stack_advanced()
-    check_env_advanced()
-    check_memory_tamper()
-    check_bytecode_advanced()
-    dynamic_execution()
-    super_junk()()
 end
 
 -- Gọi hàm bảo vệ
@@ -192,6 +79,7 @@ async def obfuscate_lua_code(lua_code: LuaCode):
     try:
         # Thêm mã bảo mật vào script nhận được
         secured_code = add_security_code(lua_code.code)
+        logger.info(f"Secured code length: {len(secured_code)}")
         
         # Lấy tên file mới
         input_filename = get_next_filename()
@@ -199,10 +87,12 @@ async def obfuscate_lua_code(lua_code: LuaCode):
         # Ghi mã Lua đã thêm bảo mật vào file
         with open(input_filename, "w", encoding="utf-8") as f:
             f.write(secured_code)
+        logger.info(f"Written to file: {input_filename}")
         
         # Chạy lệnh obfuscation
         output_filename = f"{input_filename.split('.')[0]}.obfuscated.lua"
         command = ["lua5.3", "./cli.lua", "--preset", "Medium", input_filename]
+        logger.info(f"Executing command: {' '.join(command)}")
         
         try:
             result = subprocess.run(
@@ -211,7 +101,7 @@ async def obfuscate_lua_code(lua_code: LuaCode):
                 text=True,
                 check=True
             )
-            logger.info(f"Obfuscation command executed successfully: {command}")
+            logger.info("Obfuscation command executed successfully")
         except subprocess.CalledProcessError as e:
             logger.error(f"Obfuscation failed: {e.stderr}")
             raise HTTPException(status_code=500, detail=f"Obfuscation failed: {e.stderr}")
