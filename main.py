@@ -39,14 +39,17 @@ local function chk_env() local t=math.random(1e3,9e3);rawset(_G,t,true);if not r
 local function chk_time() local s=time();for i=1,5e3 do math.random()end;if time()-s>5 then error("Time anomaly!")end end
 local function self_chk() local f=loadstring("local x=42;return x");if not f or f()~=42 then error("Integrity fail!")end end
 
--- Kiểm tra môi trường Roblox và skidder
-local function chk_roblox() local s,e=pcall(function() return _G.game and _G.game:GetService("Players") end);return s and e end
-local function chk_globals() if not _G.print or not _G.math or not _G.string then return false end return true end
+-- Kiểm tra môi trường Roblox
+local function is_roblox_env()
+    local s,e=pcall(function() return _G.game and _G.game.Players and _G.game:GetService("RunService") end)
+    return s and e
+end
+
+-- Kiểm tra skidder
 local function is_skidder()
-    if not chk_roblox() then return true end
-    if not chk_globals() then return true end
-    local orig_tostring=tostring;local test="test";if tostring(test)~="test" then return true end
-    local s,e=pcall(function() return debug end);if s and e then return true end
+    if not is_roblox_env() then return false end -- Chỉ kiểm tra nếu là môi trường Roblox
+    local orig_print=print;local test="test";local s,e=pcall(function() print=test end);if s then return true end
+    local orig_tostring=tostring;local test_val="test_val";if tostring(test_val)~=orig_tostring(test_val) then return true end
     return false
 end
 
@@ -66,11 +69,11 @@ local function protect()
     if math.random(1,1000)==42 then error("Random check failed!")end
 end
 
--- 300 hàm giả với nội dung giả
+-- 1000 hàm giả với nội dung giả
 local fake=""
-for i=1,300 do
+for i=1,1000 do
     local name
-    if i%2==0 then
+    if i%3==0 then
         name=({"autofarm","autobuy","autosell","autoquest","autoloot","autoupgrade","autospin","autotrade","autofish","autoboss",
                "autoclick","autodrop","autopick","autolevel","autohit","autofly","autokill","autobuff","autoboost","autospeed",
                "autogold","autogem","autopoint","autoevent","autotask","autowin","autobattle","autodefend","autocollect","autopet"})[math.random(1,30)]
@@ -78,7 +81,7 @@ for i=1,300 do
         name="rnd_"..string.char(math.random(97,122))..math.random(1e3,9e3)
     end
     local var="v"..math.random(1e3,9e3)
-    fake=fake.."local function "..name.."_"..var.."() local x="..math.random(1e4)..";for i=1,"..math.random(10,50).." do x=x+"..math.random(1,100)..";end;local y=game:GetService('Players').LocalPlayer;y.Character.Humanoid.WalkSpeed="..math.random(16,100)..";return x*y.WalkSpeed end;"..name.."_"..var.."();"
+    fake=fake.."local function "..name.."_"..var.."() local x="..math.random(1e4)..";for i=1,"..math.random(10,50).." do x=x+"..math.random(1,100)..";end;local y=game.Players.LocalPlayer;local z=y and y.Character and y.Character:FindFirstChild('Humanoid');if z then z.WalkSpeed="..math.random(16,100)..";end;return x end;"..name.."_"..var.."();"
 end
 
 -- Thực thi
