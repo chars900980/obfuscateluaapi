@@ -40,7 +40,7 @@ local function enc(s,k) local r="";for i=1,#s do r=r..string.char((string.byte(s
 local function dec(e,k) local r="";for i=1,#e do r=r..string.char((string.byte(e,i)-string.byte(k,i%#k+1))%256)end return r end
 
 -- Kiểm tra cơ bản
-local function chk_prnt() local s,e=pcall(function() print("v")end);if not s then error("Print tampered!")end end
+local function chk_prnt() local s,e=pcall(function() print()end);if not s then error("Print tampered!")end end
 local function chk_env() local t=math.random(1e3,9e3);rawset(_G,t,true);if not rawget(_G,t)then error("Env tampered!")end;rawset(_G,t,nil)end
 local function chk_time() local s=time();local r=math.random(3e3,7e3);for i=1,r do math.random()end;local d=time()-s;if d>3 then error("Time anomaly! Debugger detected!")end end
 local function self_chk() local f=loadstring("local x=42;return x");if not f or f()~=42 then error("Integrity fail!")end end
@@ -49,6 +49,12 @@ local function self_chk() local f=loadstring("local x=42;return x");if not f or 
 local function is_roblox_env()
     local s,e=pcall(function() return _G.game and _G.game.Players and _G.game:GetService("RunService") end)
     return s and e
+end
+
+-- Kiểm tra executor hợp lệ
+local function is_executor()
+    local s,e=pcall(function() return identifyexecutor() end)
+    return s and e~=nil
 end
 
 -- Anti-debug
@@ -83,7 +89,10 @@ end
 
 -- Hàm bảo vệ
 local function protect()
-    chk_prnt();chk_env();chk_time();self_chk();chk_debugger();chk_spy()
+    chk_prnt();chk_env();chk_time();self_chk()
+    if not is_executor() then
+        chk_debugger();chk_spy()
+    end
     if is_skidder() then nuke() end
     local k=gen_key("code_ver");local e=enc("script obfuscated by ducknovis",k);local d=dec(e,k);print(d)
     if math.random(1,1000)==42 then error("Random check failed!")end
