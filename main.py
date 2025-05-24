@@ -5,6 +5,7 @@ import os
 import subprocess
 import uuid
 import logging
+import time
 
 # Cấu hình logging
 logging.basicConfig(level=logging.INFO)
@@ -44,8 +45,13 @@ local error = error
 local math = math
 local string = string
 local pcall = pcall
+local time = os.time or function() return 0 end  -- Hỗ trợ nếu os.time bị chặn
 
--- Hàm mã hóa đơn giản
+-- Hàm mã hóa với key động
+local function generate_key()
+    return "securekey_" .. math.random(1000, 9999) .. "_" .. (time() % 1000)
+end
+
 local function encrypt(str, key)
     local result = ""
     for i = 1, #str do
@@ -56,7 +62,6 @@ local function encrypt(str, key)
     return result
 end
 
--- Hàm giải mã
 local function decrypt(enc, key)
     local result = ""
     for i = 1, #enc do
@@ -67,49 +72,56 @@ local function decrypt(enc, key)
     return result
 end
 
--- Kiểm tra môi trường
-local function check_environment()
-    local test = {}
-    rawset(_G, "test", test)
-    if _G.test ~= test then
-        error("Global environment tampering detected!")
-    end
-    if rawget(_G, "print") ~= print then
+-- Kiểm tra hành vi print an toàn
+local function safe_check_print()
+    local orig_print = print
+    local test_val = "test"
+    local success, err = pcall(function() orig_print(test_val) end)
+    if not success or err then
         error("Print function tampering detected!")
     end
 end
 
--- Kiểm tra proxy/tampering
-local function check_proxy()
-    local func = function() end
-    local mt = {}
-    mt.__call = function() error("Proxy detected!") end
-    setmetatable(func, mt)
-    local status, err = pcall(function() func() end)
-    if status then
-        error("Proxy check failed!")
+-- Kiểm tra môi trường động
+local function check_dynamic_env()
+    local test_key = "test_key_" .. math.random(1000, 9999)
+    rawset(_G, test_key, true)
+    if not rawget(_G, test_key) then
+        error("Dynamic environment tampering detected!")
     end
+    rawset(_G, test_key, nil)
 end
 
--- Tạo mã junk để làm khó phân tích
+-- Tạo mã junk phức tạp
 local function generate_junk()
     local junk = ""
-    for i = 1, math.random(10, 20) do
-        junk = junk .. string.char(math.random(65, 90)) .. " = " .. math.random(1, 1000) .. ";"
+    for i = 1, math.random(15, 25) do
+        local var = string.char(math.random(65, 90)) .. math.random(1, 999)
+        junk = junk .. var .. " = function() return " .. math.random(1, 9999) .. " end;"
+        junk = junk .. var .. "() + " .. math.random(1, 999) .. ";"
     end
     return junk
 end
 
 -- Hàm bảo vệ chính
 local function protect_code()
-    check_environment()
-    check_proxy()
-    local key = "securekey_" .. math.random(1000, 9999)
-    local enc = encrypt("Protected", key)
+    safe_check_print()
+    check_dynamic_env()
+    local key = generate_key()
+    local enc = encrypt("Protected_" .. key, key)
     local dec = decrypt(enc, key)
-    if dec ~= "Protected" then
+    if not string.find(dec, "Protected") then
         error("Encryption integrity check failed!")
     end
+    -- Thêm kiểm tra runtime
+    local function runtime_check()
+        local count = 0
+        for _ in pairs(_G) do count = count + 1 end
+        if count > 100 then
+            error("Excessive global variables detected!")
+        end
+    end
+    runtime_check()
 end
 
 -- Thêm mã junk và bảo vệ
