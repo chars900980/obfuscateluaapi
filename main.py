@@ -34,37 +34,86 @@ def get_next_filename(base_name="new", extension=".lua"):
             return filename
         counter += 1
 
-# Hàm thêm mã bảo mật vào script (đơn giản hóa để tránh lỗi lexing)
+# Hàm thêm mã bảo mật vào script
 def add_security_code(original_code):
     security_code = """
-local function super_encrypt(str, key)
+local _G = _G
+local rawget = rawget
+local rawset = rawset
+local error = error
+local math = math
+local string = string
+local pcall = pcall
+
+-- Hàm mã hóa đơn giản
+local function encrypt(str, key)
     local result = ""
     for i = 1, #str do
         local b = string.byte(str, i)
         local k = string.byte(key, (i - 1) % #key + 1)
-        result = result .. string.char(b + k)
+        result = result .. string.char((b + k) % 256)
     end
     return result
 end
 
-local function super_decrypt(enc, key)
+-- Hàm giải mã
+local function decrypt(enc, key)
     local result = ""
     for i = 1, #enc do
         local b = string.byte(enc, i)
         local k = string.byte(key, (i - 1) % #key + 1)
-        result = result .. string.char(b - k)
+        result = result .. string.char((b - k) % 256)
     end
     return result
 end
 
-local function protect_code()
-    -- Kiểm tra cơ bản
-    if debug.gethook() then
-        error("Debug hook detected!")
+-- Kiểm tra môi trường
+local function check_environment()
+    local test = {}
+    rawset(_G, "test", test)
+    if _G.test ~= test then
+        error("Global environment tampering detected!")
+    end
+    if rawget(_G, "print") ~= print then
+        error("Print function tampering detected!")
     end
 end
 
--- Gọi hàm bảo vệ
+-- Kiểm tra proxy/tampering
+local function check_proxy()
+    local func = function() end
+    local mt = {}
+    mt.__call = function() error("Proxy detected!") end
+    setmetatable(func, mt)
+    local status, err = pcall(function() func() end)
+    if status then
+        error("Proxy check failed!")
+    end
+end
+
+-- Tạo mã junk để làm khó phân tích
+local function generate_junk()
+    local junk = ""
+    for i = 1, math.random(10, 20) do
+        junk = junk .. string.char(math.random(65, 90)) .. " = " .. math.random(1, 1000) .. ";"
+    end
+    return junk
+end
+
+-- Hàm bảo vệ chính
+local function protect_code()
+    check_environment()
+    check_proxy()
+    local key = "securekey_" .. math.random(1000, 9999)
+    local enc = encrypt("Protected", key)
+    local dec = decrypt(enc, key)
+    if dec ~= "Protected" then
+        error("Encryption integrity check failed!")
+    end
+end
+
+-- Thêm mã junk và bảo vệ
+local junk = generate_junk()
 protect_code()
 
 -- Thêm mã chính của người dùng ở đây
