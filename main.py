@@ -57,8 +57,8 @@ local function generate_dynamic_key(code)
     return key .. "_" .. (code_hash % 10000)
 end
 
--- Hàm mã hóa với key động
-local function encrypt(str, key)
+-- Hàm mã hóa hai lớp
+local function encrypt_layer1(str, key)
     local result = ""
     local key_hash = 0
     for i = 1, #key do key_hash = key_hash + string.byte(key, i) end
@@ -70,8 +70,27 @@ local function encrypt(str, key)
     return result
 end
 
--- Hàm giải mã
-local function decrypt(enc, key)
+local function encrypt_layer2(str, key)
+    local result = ""
+    for i = 1, #str do
+        local b = string.byte(str, i)
+        local k = string.byte(key, (i - 1) % #key + 1)
+        result = result .. string.char((b - k + (i % 5)) % 256)
+    end
+    return result
+end
+
+local function decrypt_layer1(enc, key)
+    local result = ""
+    for i = 1, #enc do
+        local b = string.byte(enc, i)
+        local k = string.byte(key, (i - 1) % #key + 1)
+        result = result .. string.char((b + k - (i % 5)) % 256)
+    end
+    return result
+end
+
+local function decrypt_layer2(enc, key)
     local result = ""
     local key_hash = 0
     for i = 1, #key do key_hash = key_hash + string.byte(key, i) end
@@ -103,12 +122,13 @@ local function check_dynamic_env()
     rawset(_G, test_key, nil)
 end
 
--- Kiểm tra thời gian chạy bất thường
+-- Kiểm tra thời gian chạy bất thường với vòng lặp ngẫu nhiên
 local function check_execution_time()
     local start = time()
     local dummy = 0
-    for i = 1, 5000 do
-        dummy = dummy + math.random(1, 100)
+    local loops = math.random(5000, 10000)
+    for i = 1, loops do
+        dummy = dummy + math.sin(math.random(1, 100))
     end
     local duration = (time() - start)
     if duration > 5 then
@@ -116,18 +136,26 @@ local function check_execution_time()
     end
 end
 
--- Tạo mã giả (fake code) để làm khó phân tích
+-- Tạo mã giả (fake code) phức tạp hơn
 local function generate_fake_code()
     local fake = ""
-    for i = 1, math.random(5, 10) do
+    for i = 1, math.random(10, 20) do
         local var = string.char(math.random(65, 90)) .. math.random(1, 999)
-        fake = fake .. "local " .. var .. " = function() local x = " .. math.random(1, 9999) .. "; return x * 2 end;"
-        fake = fake .. var .. "();"
+        fake = fake .. "local " .. var .. " = function() local x = " .. math.random(1, 9999) .. "; return math.tan(x) * " .. math.random(1, 100) .. " end;"
+        fake = fake .. "local " .. var .. "_result = " .. var .. "();"
     end
     return fake
 end
 
--- Tự kiểm tra tính toàn vẹn của mã
+-- Kiểm tra toàn vẹn mã nâng cao với checksum
+local function compute_checksum(code)
+    local checksum = 0
+    for i = 1, #code do
+        checksum = checksum + string.byte(code, i) * (i % 13)
+    end
+    return checksum % 65536
+end
+
 local function self_integrity_check()
     local code_snippet = "local x = 42; return x"
     local func, err = loadstring(code_snippet)
@@ -137,6 +165,11 @@ local function self_integrity_check()
     local result = func()
     if result ~= 42 then
         error("Code integrity check failed: unexpected result!")
+    end
+    local expected_checksum = 12345  -- Giá trị giả định, cần tính trước
+    local actual_checksum = compute_checksum(code_snippet)
+    if actual_checksum ~= expected_checksum then
+        error("Code checksum mismatch! Tampering detected.")
     end
 end
 
@@ -148,9 +181,11 @@ local function protect_code()
     self_integrity_check()
     
     local key = generate_dynamic_key('code_verification')
-    local enc = encrypt("script obfuscated by ducknovis", key)
-    local dec = decrypt(enc, key)
-    print(dec)
+    local enc1 = encrypt_layer1("script obfuscated by ducknovis", key)
+    local enc2 = encrypt_layer2(enc1, key .. "_layer2")
+    local dec1 = decrypt_layer1(enc2, key .. "_layer2")
+    local dec2 = decrypt_layer2(dec1, key)
+    print(dec2)
     
     -- Thêm kiểm tra runtime phức tạp
     local function runtime_check()
