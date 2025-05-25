@@ -94,7 +94,7 @@ local function protect()
         chk_debugger();chk_spy()
     end
     if is_skidder() then nuke() end
-    local k=gen_key("code_ver");local e=enc("script obfuscated by ducknovis",k);local d=dec(e,k);print(d)
+    local k=gen_key("code_ver");local e=enc("script obfuscated by ducknovis with prometheus",k);local d=dec(e,k);print(d)
     if math.random(1,1000)==42 then error("Random check failed!")end
 end
 
@@ -137,7 +137,7 @@ async def obfuscate_lua_code(lua_code: LuaCode):
             raise HTTPException(status_code=500, detail="Obfuscated file not found")
         with open(output_filename, "r", encoding="utf-8") as f:
             obfuscated_code = f.read()
-        final_obfuscated_code = "-- script obfuscated by ducknovis\n" + obfuscated_code
+        final_obfuscated_code = "-- script obfuscated by ducknovis with prometheus\n" + obfuscated_code
         os.remove(input_filename)
         os.remove(output_filename)
         return {"obfuscated_code": final_obfuscated_code}
