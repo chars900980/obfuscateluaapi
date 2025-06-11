@@ -37,7 +37,7 @@ async def obfuscate_lua_code(lua_code: LuaCode):
             f.write(secured_code)
 
         output_filename = f"{input_filename.split('.')[0]}.obfuscated.lua"
-        command = ["lua5.3", "./cli.lua", "--preset", "Medium", "--nocolors", "--LuaU", input_filename]
+        command = ["lua5.3", "/opt/render/project/src/cli.lua", "--preset", "Medium", "--nocolors", "--LuaU", input_filename]
         
         try:
             result = subprocess.run(command, capture_output=True, text=True, check=True)
